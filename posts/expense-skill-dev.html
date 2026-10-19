@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>从零开发一个费用报销助手 Skill:设计思路与实现 · dev notes</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23534ab7'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'>q</text></svg>">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"从零开发一个费用报销助手 Skill:设计思路与实现","datePublished":"2026-10-02","author":{"@type":"Person","name":"qiuz"},"keywords":"自动化, Skill 开发, 发票处理, Excel 报告"}
+</script>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a class="site-logo" href="../index.html">
+      <span class="logo-mark">q</span>
+      <span>dev notes</span>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="../index.html">文章</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">☾</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <article class="article">
+    <header class="article-header">
+      <div class="article-meta">
+        <span class="post-tag">自动化</span>
+        <span class="post-tag">WorkBuddy</span>
+        <span>2026-10-02</span>
+        <span>·</span>
+        <span>11 分钟阅读</span>
+      </div>
+      <h1 class="article-title">从零开发一个费用报销助手 Skill:设计思路与实现</h1>
+      <p class="article-desc">拆解报销自动化的完整链路:发票信息提取、费用分类规则、Excel 报告生成,以及如何把重复工作沉淀成可复用的技能。</p>
+    </header>
+
+    <div class="prose">
+      <p>每个月最烦的事之一:把一堆发票图片整理成报销单。金额、日期、类型、项目归属,一项项手工填。做到第三次的时候我决定把它自动化——做一个<strong>费用报销助手 Skill</strong>,上传发票,输出统计好的 Excel。这篇记录完整的设计与实现思路。</p>
+
+      <h2>需求拆解</h2>
+      <p>先别急着写代码,把人工流程完整过一遍,看哪些步骤是规则明确的、哪些需要人来判断:</p>
+      <ol>
+        <li><strong>提取</strong>:从发票图片/PDF 读出金额、开票日期、发票类型、销售方名称</li>
+        <li><strong>分类</strong>:按费用类型归类(交通、餐饮、办公、住宿等)</li>
+        <li><strong>汇总</strong>:按类型、按项目两个维度求和</li>
+        <li><strong>输出</strong>:生成规范格式的 Excel 报销统计表</li>
+      </ol>
+      <p>其中第 1、3、4 步是完全规则化的,可以全自动;第 2 步"差旅费用归到哪个项目"涉及业务判断,做成"自动分类 + 人工确认"的组合。</p>
+
+      <h2>整体架构</h2>
+      <p>按"输入 → 处理 → 输出"三段式设计:</p>
+      <table>
+        <tr><th>模块</th><th>职责</th><th>技术点</th></tr>
+        <tr><td>输入层</td><td>接收发票图片/PDF,统一转成可解析格式</td><td>多模态模型读图,PDF 分页抽取</td></tr>
+        <tr><td>分类层</td><td>识别费用类型,差旅类追问项目归属</td><td>规则表 + 关键词匹配 + 一次交互确认</td></tr>
+        <tr><td>输出层</td><td>汇总金额,生成带格式的 Excel 报告</td><td>openpyxl 写表,按类型/项目分 sheet</td></tr>
+      </table>
+
+      <h2>关键设计决策</h2>
+      <h3>1. 发票提取的容错</h3>
+      <p>发票版式五花八门(电子票、卷票、专票),不能假设字段位置固定。用多模态模型直接"读"发票内容,让模型输出结构化字段,再对关键字段(金额合计、税额)做一次交叉校验:</p>
+      <blockquote><p>金额合计 = 不含税金额 + 税额,对不上就标记为"待人工核对",而不是静默通过。</p></blockquote>
+
+      <h3>2. 分类规则要可配置</h3>
+      <p>公司报销口径会变,规则不能写死在代码里。维护一张 <code>category-rules.yaml</code>:</p>
+<pre><code>transport:
+  keywords: [打车, 滴滴, 加油, 停车, 高铁, 机票]
+meal:
+  keywords: [餐饮, 饭店, 咖啡, 外卖]
+office:
+  keywords: [文具, 打印, 耗材, 办公]</code></pre>
+      <p>匹配不到任何规则时归入"其他",并在报告里单独列出来提醒补规则。</p>
+
+      <h3>3. 多次提交合并成一份报告</h3>
+      <p>月初、月中各报一次是常态,如果每次生成独立 Excel,月底还要手工合并。做法是:每次运行都把结果追加到同一份工作簿,按"提交批次"记录来源,月底直接出汇总 sheet。</p>
+
+      <h3>4. 原始材料留痕</h3>
+      <p>报销单要能追溯,所以每张发票的原始图片按 <code>批次/序号</code> 归档到本地目录,Excel 里存相对路径,审计时点开就能对。</p>
+
+      <h2>实现效果</h2>
+      <p>第一版跑通后的实际数据:一次处理 11 张发票,合计 ¥5,074.76,自动分类准确,差旅类经一次追问归属到对应项目,最终输出一份三 sheet 的报告(按类型汇总 / 按项目汇总 / 明细清单)。全程大约两分钟,而手工做同样的事要半小时以上。</p>
+
+      <h2>沉淀成 Skill 的价值</h2>
+      <p>这个流程做一次不难,难的是每个月稳定复现。把它封装成 Skill 之后:</p>
+      <ul>
+        <li>规则、路径、输出格式全部固定,不靠记忆</li>
+        <li>下个月直接调用,不用重新解释需求</li>
+        <li>规则变更时只改一个配置文件</li>
+      </ul>
+      <p>这才是"重复工作技能化"的正确姿势:不是每次从头描述任务,而是把决策和流程固化下来,让工具替你执行。</p>
+    </div>
+
+    <footer class="article-footer">
+      <a class="back-link" href="../index.html">← 返回文章列表</a>
+      <div class="article-nav">
+        <a class="prev" href="electron-vue3-notes.html">
+          <div class="nav-dir">← 上一篇</div>
+          <div class="nav-title">Electron + Vue 3 + TypeScript 桌面应用开发踩坑记录</div>
+        </a>
+        <a class="next" href="ros2-env-setup.html">
+          <div class="nav-dir">下一篇 →</div>
+          <div class="nav-title">Ubuntu 24.04 + ROS 2 机器人开发环境搭建笔记</div>
+        </a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-footer container">
+  <span>dev notes · 用 ♥ 和 markdown 构建</span>
+  <span>Powered by WorkBuddy</span>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

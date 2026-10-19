@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>dev notes · qiuz 的技术笔记</title>
+<meta name="description" content="ROS 2 机器人开发、SLAM 选型、Electron 桌面端与自动化工具的技术实践笔记">
+<link rel="canonical" href="https://YOUR-DOMAIN-HERE/index.html">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Blog","name":"dev notes","author":{"@type":"Person","name":"qiuz"},"description":"ROS 2 机器人开发、SLAM 选型、Electron 桌面端与自动化工具的技术实践笔记","inLanguage":"zh-CN"}
+</script>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23534ab7'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'>q</text></svg>">
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a class="site-logo" href="index.html">
+      <span class="logo-mark">q</span>
+      <span>dev notes</span>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="index.html">文章</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">☾</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <section class="hero">
+    <h1 class="hero-title">写代码,也写笔记。<br>记录<span class="hl">机器人开发</span>与工程实践。</h1>
+    <p class="hero-sub">这里是我的技术博客:ROS 2 环境搭建、SLAM 方案选型、Electron + Vue 3 桌面端开发、自动化工具设计。每篇文章都是踩过坑之后的复盘,力求可复现。</p>
+    <div class="hero-stats">
+      <div><div class="stat-num" id="stat-posts">4</div><div class="stat-label">篇文章</div></div>
+      <div><div class="stat-num" id="stat-tags">6</div><div class="stat-label">个标签</div></div>
+      <div><div class="stat-num">2026</div><div class="stat-label">年开始更新</div></div>
+    </div>
+  </section>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="search-input" placeholder="搜索文章标题、内容关键词…">
+    </div>
+    <div class="tag-filter" id="tag-filter"></div>
+  </div>
+
+  <section class="post-list" id="post-list"></section>
+  <div class="empty-state" id="empty-state">没有找到匹配的文章,换个关键词试试。</div>
+</main>
+
+<footer class="site-footer container">
+  <span>dev notes · 用 ♥ 和 markdown 构建</span>
+  <span>Powered by WorkBuddy</span>
+</footer>
+
+<script src="assets/js/posts.js"></script>
+<script src="assets/js/main.js"></script>
+</body>
+</html>

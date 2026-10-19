@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Electron + Vue 3 + TypeScript 桌面应用开发踩坑记录 · dev notes</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23534ab7'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'>q</text></svg>">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"Electron + Vue 3 + TypeScript 桌面应用开发踩坑记录","datePublished":"2026-10-08","author":{"@type":"Person","name":"qiuz"},"keywords":"Electron, Vue 3, TypeScript, Playwright, 桌面应用"}
+</script>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a class="site-logo" href="../index.html">
+      <span class="logo-mark">q</span>
+      <span>dev notes</span>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="../index.html">文章</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">☾</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <article class="article">
+    <header class="article-header">
+      <div class="article-meta">
+        <span class="post-tag">Electron</span>
+        <span class="post-tag">前端</span>
+        <span>2026-10-08</span>
+        <span>·</span>
+        <span>14 分钟阅读</span>
+      </div>
+      <h1 class="article-title">Electron + Vue 3 + TypeScript 桌面应用开发踩坑记录</h1>
+      <p class="article-desc">基于 MediaTrace 项目整理 Electron 33 + Vue3 + Playwright 的工程实践:渲染进程隔离、自动更新、Playwright 下载与打包的常见问题。</p>
+    </header>
+
+    <div class="prose">
+      <p>MediaTrace 是我在维护的一个桌面应用,技术栈是 <strong>Electron 33 + Vue 3 + TypeScript + Playwright</strong>。这篇文章把开发过程中真正卡住我的几个问题整理出来,每个都附了解决方案,属于"早知道能省半天"的那种笔记。</p>
+
+      <h2>1. Playwright 的浏览器下载</h2>
+      <p>第一次装好 Playwright 跑脚本报 <code>browserType.launch: Executable doesn't exist</code>。原因是 npm 装 Playwright 时不会自动下载浏览器二进制,需要手动执行:</p>
+<pre><code>npx playwright install chromium</code></pre>
+      <p>注意国内网络直接 install 很容易超时,可以加镜像:</p>
+<pre><code>PLAYWRIGHT_DOWNLOAD_HOST=https://cdn.npmmirror.com/binaries/playwright
+npx playwright install chromium</code></pre>
+      <blockquote><p>打包成 Electron 应用时,Playwright 的浏览器不会打进安装包,要么随包分发(体积 +150MB 左右),要么首次启动时静默下载。</p></blockquote>
+
+      <h2>2. 渲染进程里用不了 Node API</h2>
+      <p>Vue 组件里 <code>require('fs')</code> 直接白屏——Electron 默认给渲染进程关了 Node 集成。正确做法是分层:</p>
+      <ul>
+        <li><strong>渲染进程(Vue)</strong>:只碰 UI,通过 <code>window.api</code> 调预暴露的方法</li>
+        <li><strong>预加载脚本(preload)</strong>:用 <code>contextBridge.exposeInMainWorld</code> 白名单式暴露接口</li>
+        <li><strong>主进程</strong>:所有文件、网络、系统调用在这里执行</li>
+      </ul>
+<pre><code>// preload.ts
+import { contextBridge } from "electron";
+
+contextBridge.exposeInMainWorld("api", {
+  readFile: (path: string) =&gt; ipcRenderer.invoke("file:read", path),
+});</code></pre>
+      <p>配套的 <code>webPreferences</code> 一定要显式收紧:</p>
+<pre><code>new BrowserWindow({
+  webPreferences: {
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: true,
+    preload: path.join(__dirname, "preload.js"),
+  },
+});</code></pre>
+
+      <h2>3. TypeScript 的类型声明</h2>
+      <p><code>window.api</code> 在 Vue 里是 <code>any</code> 的话,TS 就白装了。建一个 <code>types/global.d.ts</code>:</p>
+<pre><code>interface ElectronApi {
+  readFile: (path: string) =&gt; Promise&lt;string&gt;;
+}
+
+declare global {
+  interface Window {
+    api: ElectronApi;
+  }
+}
+
+export {};</code></pre>
+      <p>注意文件里必须有 <code>export {}</code>,否则会被当成脚本而不是模块,全局声明不生效。</p>
+
+      <h2>4. 自动更新</h2>
+      <p>Electron 没有内置更新器,常用组合是 <code>electron-updater</code> + 一个静态文件服务器(或 GitHub Releases):</p>
+<pre><code>import { autoUpdater } from "electron-updater";
+
+autoUpdater.checkForUpdatesAndNotify();
+autoUpdater.on("update-downloaded", () =&gt; {
+  autoUpdater.quitAndInstall();
+});</code></pre>
+      <p>坑在于:<strong>开发环境不会触发更新</strong>,<code>autoUpdater</code> 只在打包后的应用里工作。测试更新流程时,要么打一个低版本号的包装上,要么用 <code>dev-app-update.yml</code> 指向本地目录模拟。</p>
+
+      <h2>5. Vue 3 的 keep-alive 与路由</h2>
+      <p>Vue Router 4 里用 <code>keep-alive</code> 缓存列表页,返回时不再重新请求数据。但缓存会导致"数据不刷新"的 bug——退出详情页回来列表不动。解法是给列表页注册 <code>onActivated</code> 钩子,按需刷新:</p>
+<pre><code>import { onActivated } from "vue";
+
+onActivated(() =&gt; {
+  if (needsRefresh.value) loadList();
+});</code></pre>
+
+      <h2>打包体积优化</h2>
+      <p>默认 electron-builder 产物 80MB 起步。几个有效的瘦身手段:</p>
+      <table>
+        <tr><th>手段</th><th>效果</th></tr>
+        <tr><td>用 Vite 构建渲染进程,替代 webpack</td><td>产物体积明显下降,构建更快</td></tr>
+        <tr><td>只打单平台单架构(如 mac arm64)</td><td>安装包减半</td></tr>
+        <tr><td>剔除 asar 里的 source map 和 locales 多余语言</td><td>再省 10-20MB</td></tr>
+      </table>
+
+      <h2>小结</h2>
+      <p>Electron + Vue 3 的开发体验已经相当成熟,真正的坑都集中在<strong>进程边界</strong>和<strong>分发环节</strong>:进程隔离要早做,别等报错了再拆;更新和下载逻辑要在打包环境下验证,开发环境看不出来。</p>
+    </div>
+
+    <footer class="article-footer">
+      <a class="back-link" href="../index.html">← 返回文章列表</a>
+      <div class="article-nav">
+        <a class="prev" href="slam-selection.html">
+          <div class="nav-dir">← 上一篇</div>
+          <div class="nav-title">激光 SLAM vs 视觉 SLAM:轮式机器人方案选型对比</div>
+        </a>
+        <a class="next" href="expense-skill-dev.html">
+          <div class="nav-dir">下一篇 →</div>
+          <div class="nav-title">从零开发一个费用报销助手 Skill:设计思路与实现</div>
+        </a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-footer container">
+  <span>dev notes · 用 ♥ 和 markdown 构建</span>
+  <span>Powered by WorkBuddy</span>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

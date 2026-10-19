@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>激光 SLAM vs 视觉 SLAM:轮式机器人方案选型对比 · dev notes</title>
+<link rel="stylesheet" href="../assets/css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%23534ab7'/><text x='50' y='68' font-size='52' text-anchor='middle' fill='white' font-family='sans-serif'>q</text></svg>">
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"Article","headline":"激光 SLAM vs 视觉 SLAM:轮式机器人方案选型对比","datePublished":"2026-10-12","author":{"@type":"Person","name":"qiuz"},"keywords":"SLAM, 激光雷达, 视觉SLAM, 轮式机器人, 导航"}
+</script>
+</head>
+<body>
+
+<nav class="site-nav">
+  <div class="nav-inner">
+    <a class="site-logo" href="../index.html">
+      <span class="logo-mark">q</span>
+      <span>dev notes</span>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="../index.html">文章</a>
+      <button class="theme-toggle" id="theme-toggle" aria-label="切换主题">☾</button>
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  <article class="article">
+    <header class="article-header">
+      <div class="article-meta">
+        <span class="post-tag">SLAM</span>
+        <span class="post-tag">机器人</span>
+        <span>2026-10-12</span>
+        <span>·</span>
+        <span>10 分钟阅读</span>
+      </div>
+      <h1 class="article-title">激光 SLAM vs 视觉 SLAM:轮式机器人方案选型对比</h1>
+      <p class="article-desc">从传感器成本、建图精度、光照鲁棒性、计算开销四个维度对比两种主流 SLAM 方案,并给出医院和学校场景的适配建议。</p>
+    </header>
+
+    <div class="prose">
+      <p>轮式机器人要自主移动,第一步就是知道"我在哪、周围长什么样",这就是 SLAM(同步定位与建图)。主流方案分两派:<strong>激光 SLAM</strong> 和 <strong>视觉 SLAM</strong>。这篇从工程落地角度做一次系统对比。</p>
+
+      <h2>两派的基本原理</h2>
+      <p><strong>激光 SLAM</strong> 靠 2D/3D 激光雷达(如 RPLIDAR、Velodyne)测距,每帧获得环境的距离点云,用扫描匹配估计机器人位姿,同时维护一张栅格地图。代表方案:slam_toolbox、GMapping、Cartographer。</p>
+      <p><strong>视觉 SLAM</strong> 靠摄像头(单目 / 双目 / RGB-D)提取特征点,通过多视图几何估计运动和深度,直接"重建"环境。代表方案:ORB-SLAM3、RTAB-MAP、VINS-Fusion。</p>
+
+      <h2>四个核心维度对比</h2>
+      <table>
+        <tr><th>维度</th><th>激光 SLAM</th><th>视觉 SLAM</th></tr>
+        <tr><td>传感器成本</td><td>2D 雷达数百到数千元,3D 雷达上不封顶</td><td>普通摄像头几十元起,RGB-D 相机千元级</td></tr>
+        <tr><td>建图精度</td><td>测距直接、几何精度高,但缺少语义信息</td><td>纹理丰富区域精度高,弱纹理场景易丢特征</td></tr>
+        <tr><td>光照鲁棒性</td><td>主动发光,不受环境光影响,黑暗可用</td><td>被动成像,强光/逆光/黑暗中性能骤降</td></tr>
+        <tr><td>计算开销</td><td>扫描匹配轻量,嵌入式平台可跑</td><td>特征提取+优化吃算力,通常需要 GPU 或高性能 CPU</td></tr>
+      </table>
+
+      <h2>场景适配:医院与学校</h2>
+      <p>我关心的两个场景——医院和学校——恰好把两种方案的差异放大了:</p>
+      <h3>医院场景</h3>
+      <ul>
+        <li><strong>光照复杂</strong>:走廊 24 小时开灯,但病房内外明暗反差大,视觉方案容易丢特征</li>
+        <li><strong>人员密集且移动随机</strong>:激光雷达的 360° 测距能立刻发现突然出现的行人,动态物体过滤也更成熟</li>
+        <li><strong>安全优先</strong>:激光 SLAM 的位姿估计不依赖视觉特征"跑丢",可靠性更高</li>
+      </ul>
+      <p>结论:医院场景<strong>首选激光 SLAM</strong>,2D 雷达 + slam_toolbox 足以覆盖走廊导航;若要识别"这是病房还是药房",再叠加一层视觉做语义。</p>
+
+      <h3>学校场景</h3>
+      <ul>
+        <li>白天自然光充足、走廊有窗,光照条件反而比医院好</li>
+        <li>空旷操场、大教室属于弱纹理环境,纯视觉方案吃亏</li>
+        <li>预算敏感,大规模部署要控制单机成本</li>
+      </ul>
+      <p>结论:同样推荐<strong>激光 SLAM 为主</strong>;若要做"带地图语义的引导机器人"(比如导航到某间教室并介绍),再补一个低成本 RGB-D 相机。</p>
+
+      <h2>最终选型</h2>
+      <p>综合两个场景,我的方案:</p>
+      <ol>
+        <li><strong>主力定位</strong>:2D 激光雷达 + slam_toolbox,构建 2D 栅格地图,驱动 Nav2</li>
+        <li><strong>避障增强</strong>:在机器人腰部加一个朝前的 RGB-D 相机,只做近距离障碍检测,不参与全局建图</li>
+        <li><strong>语义预留</strong>:后续接一个轻量视觉模型识别门牌、科室标识,作为"伪语义层"挂在导航栈上</li>
+      </ol>
+      <blockquote><p>工程上的经验:不要追求"一套方案打天下"。激光负责稳,视觉负责语义,分层组合比单栈 all-in 鲁棒得多。</p></blockquote>
+
+      <h2>小结</h2>
+      <p>纯激光便宜可靠,纯视觉便宜但娇气,组合方案贵一点但好维护。对医院、学校这种"安全第一、环境多变"的场景,激光打底是理性选择。下一篇聊聊环境搭建的细节,见<a href="ros2-env-setup.html">《Ubuntu 24.04 + ROS 2 环境搭建笔记》</a>。</p>
+    </div>
+
+    <footer class="article-footer">
+      <a class="back-link" href="../index.html">← 返回文章列表</a>
+      <div class="article-nav">
+        <a class="prev" href="ros2-env-setup.html">
+          <div class="nav-dir">← 上一篇</div>
+          <div class="nav-title">Ubuntu 24.04 + ROS 2 机器人开发环境搭建笔记</div>
+        </a>
+        <a class="next" href="electron-vue3-notes.html">
+          <div class="nav-dir">下一篇 →</div>
+          <div class="nav-title">Electron + Vue 3 + TypeScript 桌面应用开发踩坑记录</div>
+        </a>
+      </div>
+    </footer>
+  </article>
+</main>
+
+<footer class="site-footer container">
+  <span>dev notes · 用 ♥ 和 markdown 构建</span>
+  <span>Powered by WorkBuddy</span>
+</footer>
+
+<script src="../assets/js/main.js"></script>
+</body>
+</html>

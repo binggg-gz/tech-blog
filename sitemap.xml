@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- TODO: 发布后把 YOUR-DOMAIN-HERE 替换成真实域名 -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://YOUR-DOMAIN-HERE/index.html</loc>
+    <changefreq>weekly</changefreq>
+    <priority>1.0</priority>
+  </url>
+  <url>
+    <loc>https://YOUR-DOMAIN-HERE/posts/ros2-env-setup.html</loc>
+    <date>2026-10-15</date>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://YOUR-DOMAIN-HERE/posts/slam-selection.html</loc>
+    <date>2026-10-12</date>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://YOUR-DOMAIN-HERE/posts/electron-vue3-notes.html</loc>
+    <date>2026-10-08</date>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://YOUR-DOMAIN-HERE/posts/expense-skill-dev.html</loc>
+    <date>2026-10-02</date>
+    <priority>0.8</priority>
+  </url>
+</urlset>
